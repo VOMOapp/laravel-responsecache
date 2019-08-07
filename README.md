@@ -71,7 +71,7 @@ return [
      * configured in app/config/cache.php
      */
     'cache_store' => env('RESPONSE_CACHE_DRIVER', 'file'),
-    
+
     /*
      * If the cache driver you configured supports tags, you may specify a tag name
      * here. All responses will be tagged. When clearing the responsecache only
@@ -80,10 +80,18 @@ return [
      * You may use a string or an array here.
      */
     'cache_tag' => '',
+
+    /*
+     * Here you may define replacers that dynamically replace content from the response.
+     * Each replacer must implement the Replacer interface.
+     */
+    'replacers' => [
+        \Spatie\ResponseCache\Replacers\CsrfTokenReplacer::class,
+    ],
 ];
 ```
 
-And finally you should install the provided middlewares `\Spatie\ResponseCache\Middlewares\CacheResponse::class` and `\Spatie\ResponseCache\Middlewares\DoNotCacheResponse` in the http kernel. 
+And finally you should install the provided middlewares `\Spatie\ResponseCache\Middlewares\CacheResponse::class` and `\Spatie\ResponseCache\Middlewares\DoNotCacheResponse` in the http kernel.
 
 
 ```php
@@ -142,7 +150,7 @@ ResponseCache::forget('/some-uri', '/other-uri');
 ```
 
 ### Preventing a request from being cached
-Requests can be ignored by using the `doNotCacheResponse`-middleware. 
+Requests can be ignored by using the `doNotCacheResponse`-middleware.
 This middleware [can be assigned to routes and controllers](http://laravel.com/docs/master/controllers#controller-middleware).
 
 Using the middleware are route could be exempt from being cached.
@@ -167,8 +175,8 @@ class UserController extends Controller
 
 
 ### Creating a custom cache profile
-To determine which requests should be cached, and for how long, a cache profile class is used. 
-The default class that handles these questions is `Spatie\ResponseCache\CacheProfiles\CacheAllSuccessfulGetRequests`. 
+To determine which requests should be cached, and for how long, a cache profile class is used.
+The default class that handles these questions is `Spatie\ResponseCache\CacheProfiles\CacheAllSuccessfulGetRequests`.
 
 You can create your own cache profile class by implementing the `
 Spatie\ResponseCache\CacheProfiles\CacheProfile`-interface. Let's take a look at the interface:
@@ -229,7 +237,7 @@ Route::get('/my-special-snowflake', 'SnowflakeController@index')->middleware('ca
 // cache all these routes for 10 minutes
 Route::group(function() {
    Route::get('/another-special-snowflake', 'AnotherSnowflakeController@index');
-   
+
    Route::get('/yet-another-special-snowflake', 'YetAnotherSnowflakeController@index');
 })->middleware('cacheResponse:10');
 ```
@@ -258,15 +266,44 @@ This event is fired when a request passes through the `ResponseCache` middleware
 
 These events are fired respectively when the `responsecache:clear` is started and finished.
 
-### CSRF Tokens
+### Creating a Replacer
+To replace cached content by dynamic content, you can create a replacer.
+By default we add a `CsrfTokenReplacer` in the config file.
 
-When a response is cached and a CSRF token exists on the page, it too will be cached and cause token mismatch or page expired errors. You can't reliably cache the response for the entire page when using forms that require CSRF tokens because the tokens will never match.
+You can create your own replacers by implementing the `Spatie\ResponseCache\Replacers\Replacer`-interface. Let's take a look at the interface:
 
-It is recommended that you disable response caching for pages where forms exists to avoid these errors.
+ ```php
+interface Replacer
+{
+    /*
+     * Transform the initial response before it gets cached.
+     *
+     * For example: replace a generated csrf_token by '<csrf-token-here>' that you can
+     * replace with its dynamic counterpart when the cached response is returned.
+     */
+    public function transformInitialResponse(Response $response): void;
 
-Alternatively, but not recommended, you may disable CSRF protection on a per-route basis. It is highly unadvisable to disable CSRF for user-authenticated pages at the risk of cross-site request forgery.
+/*
+     * Replace any data you want in the cached response before it gets
+     * sent to the browser.
+     *
+     * For example: replace '<csrf-token-here>' by a call to csrf_token()
+     */
+    public function replaceCachedResponse(Response $response): void;
+}
+```
 
-See how to disable CSRF on per-route basis here: https://laracasts.com/discuss/channels/laravel/disabling-csrf-for-a-specific-route-in-laravel-5
+Afterwards you can define your replacer in the `responsecache.php` config file:
+
+```php
+/*
+ * Here you may define replacers that dynamically replace content from the response.
+ * Each replacer must implement the Replacer interface.
+ */
+'replacers' => [
+    \Spatie\ResponseCache\Replacers\CsrfTokenReplacer::class,
+],
+```
 
 ## Changelog
 
@@ -309,7 +346,7 @@ We publish all received postcards [on our company website](https://spatie.be/en/
 
 Spatie is a webdesign agency based in Antwerp, Belgium. You'll find an overview of all our open source projects [on our website](https://spatie.be/opensource).
 
-Does your business depend on our contributions? Reach out and support us on [Patreon](https://www.patreon.com/spatie). 
+Does your business depend on our contributions? Reach out and support us on [Patreon](https://www.patreon.com/spatie).
 All pledges will be dedicated to allocating workforce on maintenance and new awesome stuff.
 
 ## License
